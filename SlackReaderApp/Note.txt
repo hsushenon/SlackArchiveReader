@@ -1,0 +1,17 @@
+﻿
+
+This app is build so that the archive data downloaded from Slack which is in the form of JSON files
+can be parsed and then a new format created so that user can read it.
+
+ To download the archive file from Slack, go to  https://slack.com/archives and then click Export Data.
+ It might take a while. You have to be the admin user, creator of the group.
+
+ Note:
+ To display emoticons, a folder with all emoticons ("Graphics") has to be copied to the output folder path
+
+ References:
+ https://gist.github.com/levelsio/122907e95956602e5c09
+ http://www.newtonsoft.com/json
+ http://json2csharp.com
+
+ 
