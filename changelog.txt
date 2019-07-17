@@ -1,7 +1,0 @@
-
-Changelog for version 0.5 Date 18 August 2018
-1. Added emoticons, note have to add graphics folder in output folder path
-2. Added reactions to messages
-3. Fixed to show links in the messages
-4. Fixed multiple consecutive messages from the same person in the same day should be without the time stamp
-5. Show version in UI
