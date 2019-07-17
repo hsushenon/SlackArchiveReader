@@ -1,0 +1,6 @@
+Changelog for version 0.6 Date 5 May 2019
+1. Copy Graphics folder into the target folder automatically from the source path.
+2. Fixed the order of message issue. 
+3. Fixed some reactions missing
+4. Fixed emoji within message not translated
+5. Fixed incorrect image linked
