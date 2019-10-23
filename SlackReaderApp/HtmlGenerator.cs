@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -42,7 +41,29 @@ namespace SlackReaderApp
         public string AddContent(string message, bool isBold, bool checkEmoticon)
         {
             string outMessage = String.Empty;
-            
+            //check for text formatting, italics,  e.g _really_  should be rendered as really in italics
+            if (checkEmoticon)
+            {
+                string pattern = @"\b(_)\S*(_)\b";//@"\:[a-z0-9_\+-]\+\:";
+                Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
+
+                bool hasItalics = rgx.IsMatch(message);
+                if (hasItalics)
+                {
+                    //Replace emoticon symbol with image
+
+                    MatchCollection mc = Regex.Matches(message, pattern);
+
+                    foreach (Match m in mc)
+                    {
+                        if (m.Value.Length > 2)
+                        {
+                            string word = m.Value.Substring(1, m.Value.Length - 2);
+                            message = message.Replace(m.Value, "<i>"+ word + "</i>");
+                        }
+                    }
+                }
+            }
             //check for emoticon
             if (checkEmoticon)
             {

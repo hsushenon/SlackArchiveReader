@@ -41,8 +41,6 @@
             // 
             // btnStart
             // 
-            this.btnStart.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
             this.btnStart.Location = new System.Drawing.Point(472, 19);
             this.btnStart.MinimumSize = new System.Drawing.Size(100, 0);
             this.btnStart.Name = "btnStart";
@@ -135,7 +133,7 @@
             this.Controls.Add(this.btnStart);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "SlackReaderForm";
-            this.Text = "Slack reader v0.6";
+            this.Text = "Slack reader v0.7";
             this.ResumeLayout(false);
             this.PerformLayout();
 

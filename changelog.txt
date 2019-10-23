@@ -1,3 +1,13 @@
+Changelog for version 0.7 Date 22 Oct 2019
+1. Don't stretch Start button. It should stay fixed sized.
+2. Image Title Missing
+3. Text formatting 
+4. Thread replies out of place
+5. Screenshot message order issue
+6. Messages > 5 mins apart to be treated as separate
+
+Time 1 h
+
 Changelog for version 0.6 Date 5 May 2019
 1. Copy Graphics folder into the target folder automatically from the source path.
 2. Fixed the order of message issue. 

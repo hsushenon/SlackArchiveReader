@@ -19,7 +19,14 @@ namespace SlackReaderApp
         public List<File> files { get; set; }
         public List<Reaction> reactions { get; set; }
         public List<attachments> attachments { get; set; }
+        public List<Reply> replies { get; set; }
 
+    }
+
+    public class Reply
+    {
+        public string user { get; set; }
+        public string ts { get; set; }
     }
 
     public class Reaction

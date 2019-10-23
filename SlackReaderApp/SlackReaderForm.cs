@@ -7,25 +7,34 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Linq;
 
 namespace SlackReaderApp
 {
     public partial class SlackReaderForm : Form
     {
-        string m_OutputFolderPath = @"C:\Projects\My projects\SlackReaderApp\Output";
+        string m_OutputFolderPath = @"C:\Projects\My projects\SlackReaderApp\Output\";
         string m_ArchiveFolderPath = @"C:\Projects\My projects\SlackReaderApp\BowbazarSlackExportJun2017_Test2\";
-        string m_UsersFilerPath = @"C:\Projects\My projects\SlackReaderApp\BowbazarSlackExportJun2017_Test\users.json";
+        string m_UsersFilerPath = @"C:\Projects\My projects\SlackReaderApp\BowbazarSlackExportJun2017_Test2\users.json";
+        string m_ImageFolder = string.Empty;
+        string m_GraphicsFolder = string.Empty;
+        string m_FilesFolder = string.Empty;
+        int m_FileIndex = 1;
+
         Dictionary<string, UserName> m_UserDic = new Dictionary<string, UserName>();
         private Dictionary<string, string> m_EmoticonDic;
         string m_EmoticonList = @"C:\Projects\My projects\SlackReaderApp\emoticonList.txt";
         // This delegate enables asynchronous calls for setting  
         // the text property on a TextBox control.  
         delegate void StringArgReturningVoidDelegate(string text);
+
+        const bool IS_DEBUG = false;//TODO set to false when deploy, change for when debug testing
         
         public SlackReaderForm()
         {
             try
             {
+              
                 InitializeComponent();
                 
                 LoadEmoticons(m_EmoticonList);
@@ -84,38 +93,41 @@ namespace SlackReaderApp
                 this.txtMessage.AppendText("Done.");
                 btnStart.Enabled = true;
             }
-            
         }
 
         private void Start()
         {
             try
             {
-                int fileIndex = 1;
+                m_FileIndex = 1;
                 //Create folder for image to download
-                string imageFolder = m_OutputFolderPath + "\\Images";
-                string graphicsFolder = m_OutputFolderPath + "\\Graphics";
-                string filesFolder = m_OutputFolderPath + "\\Files";
-                if (!Directory.Exists(imageFolder))
+                m_ImageFolder = m_OutputFolderPath + "\\Images";
+                m_GraphicsFolder = m_OutputFolderPath + "\\Graphics";
+                m_FilesFolder = m_OutputFolderPath + "\\Files";
+
+                if (!IS_DEBUG)
                 {
-                    Directory.CreateDirectory(imageFolder);
-                }
-                if (!Directory.Exists(filesFolder))
-                {
-                    Directory.CreateDirectory(filesFolder);
-                }
-                if (!Directory.Exists(graphicsFolder))
-                {
-                    //Check if the Graphics folder exist then copy it to output folder
-                    string graphicsSourceFolderPath = ".\\Graphics";
-                    if (!Directory.Exists(graphicsSourceFolderPath))
+                    if (!Directory.Exists(m_ImageFolder))
                     {
-                        MessageBox.Show("Could not find the graphics folder, please copy it to the output folder path");
-                        return;
+                        Directory.CreateDirectory(m_ImageFolder);
                     }
-                    else
+                    if (!Directory.Exists(m_FilesFolder))
                     {
-                        Common.DirectoryCopy(graphicsSourceFolderPath, graphicsFolder, false);
+                        Directory.CreateDirectory(m_FilesFolder);
+                    }
+                    if (!Directory.Exists(m_GraphicsFolder))
+                    {
+                        //Check if the Graphics folder exist then copy it to output folder
+                        string graphicsSourceFolderPath = ".\\Graphics";
+                        if (!Directory.Exists(graphicsSourceFolderPath))
+                        {
+                            MessageBox.Show("Could not find the graphics folder, please copy it to the output folder path");
+                            return;
+                        }
+                        else
+                        {
+                            Common.DirectoryCopy(graphicsSourceFolderPath, m_GraphicsFolder, false);
+                        }
                     }
                 }
 
@@ -127,7 +139,8 @@ namespace SlackReaderApp
                     UserName un = new UserName();
                     un.Name = u.Name;
                     un.Real_name = u.Real_name;
-                    m_UserDic.Add(u.ID, un);
+                    if (!m_UserDic.ContainsKey(u.ID))
+                        m_UserDic.Add(u.ID, un);
                 }
                 
 
@@ -166,8 +179,15 @@ namespace SlackReaderApp
 
                         //multiple consecutive messages from the same person in the same day should be without the time stamp
                         string lastUser = string.Empty;
+                        DateTime lastMessageTime = DateTime.Now;
+
                         foreach (SlackMessage sm in smList)
                         {
+                            if (sm.SubType != null && sm.SubType.Equals("thread_broadcast"))
+                            {
+                                continue;//as the message is in thread and handled separately.
+                            }
+
                             double time = double.Parse(sm.TS);
                             DateTime dt = UnixTimeStampToDateTime(time);
 
@@ -188,87 +208,108 @@ namespace SlackReaderApp
                                 //}
                             }
 
-                            if (!un.Real_name.Equals(lastUser))
+                            if (!un.Real_name.Equals(lastUser)  || dt.Subtract(lastMessageTime).TotalMinutes > 5)
                             {
                                 gen.AddContent(un.Real_name + " " + dt.ToLongTimeString(), true, false);
                                 lastUser = un.Real_name;
                             }
+                          
+                            lastMessageTime = dt;
 
                             //special handling to replace userID with username when join 
                             if (sm.SubType != null)
-                            {
+                            {   //TODO create enums for subtype
                                 if (sm.SubType.Equals("channel_join") || sm.SubType.Equals("channel_purpose"))
                                 {
                                     //Channel join message is like  "<@U0535FH0Q|hsushenon> has joined the channel"
                                     string currentText = string.Format("<@{0}|{1}>", sm.User, un.Name);
                                     sm.Text = sm.Text.Replace(currentText, un.Real_name);
                                 }
+                              
                             }
 
+                            string outMessage = gen.AddContent(sm.Text, false, true); //Move up as if text and file is there text is first then file
 
-                            if (sm.files != null)//.File != null) JSON format changed
+                            if (sm.replies != null)
                             {
-                                foreach (File f in sm.files)
+                                foreach (Reply r in sm.replies)
                                 {
-                                    //change name of file as some has same name
-                                    string name = f.name;
-                                    string indexString = "_" + fileIndex++ + ".";
-                                    name = name.Replace(".", indexString);
+                                    HandleReplyThread(r, smList, gen, dateMessage);
 
-
-                                    if (f.mimetype.Contains("image"))// for test&& channelName.Equals("photos"))
-                                    {
-                                        //Download image
-
-                                        string fileName = imageFolder + "\\" + name;
-                                        DownloadImage(f.url_private_download, fileName);
-
-                                        SetText(string.Format("Downloading image {0}", fileName));
-
-                                        string imageTag = string.Format("<img src='Images/{0}' width='{1}' height='{2}'>", name, f.thumb_360_w, f.thumb_360_h);
-                                        gen.AddContent(imageTag, false, false);
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        //file_share
-                                        //Download other types
-                                        string fileName = filesFolder + "\\" + name;
-                                        DownloadImage(f.url_private_download, fileName);
-
-                                        SetText(string.Format("Downloading file {0}", fileName));
-
-                                        gen.AddLinkContent(fileName);
-                                        continue;
-                                    }
                                 }
+                                //Set last user to blank as need to set user name again after going through thread
+                                lastUser = string.Empty;
                             }
 
-                            string outMessage = gen.AddContent(sm.Text, false, true);
+                            if (sm.files != null)  //.File != null) JSON format changed in may 2019
+                            {
+                                HandleFiles(sm, gen);
+                                //TODO cleanup
+                                //foreach (File f in sm.files)
+                                //{
+                                //    //change name of file as some has same name
+                                //    string name = f.name;
+                                //    string indexString = "_" + m_FileIndex++ + ".";
+                                //    name = name.Replace(".", indexString);
+
+                                //    if (f.mimetype.Contains("image"))// for test&& channelName.Equals("photos"))
+                                //    {
+                                //        //Download image
+
+                                //        string fileName = m_ImageFolder + "\\" + name;
+                                //        DownloadImage(f.url_private_download, fileName);
+
+                                //        SetText(string.Format("Downloading image {0}", fileName));
+
+
+                                //        string imageTag = string.Format("<img src='Images/{0}' width='{1}' height='{2}'>", name, f.thumb_360_w, f.thumb_360_h);
+                                //        gen.AddContent(f.title, false, false);
+                                //        gen.AddContent(imageTag, false, false);
+                                //        continue;
+                                //    }
+                                //    else
+                                //    {
+                                //        //file_share
+                                //        //Download other types
+                                //        string fileName = m_FilesFolder + "\\" + name;
+                                //        DownloadImage(f.url_private_download, fileName);
+
+                                //        SetText(string.Format("Downloading file {0}", fileName));
+
+                                //        gen.AddLinkContent(fileName);
+                                //        continue;
+                                //    }
+                                //}
+                            }
+
+                            //string outMessage = gen.AddContent(sm.Text, false, true);
 
                             if (!string.IsNullOrEmpty(outMessage))
                             {
                                 SetText(outMessage + "Date: " + dateMessage);
                             }
+
                             //Handle attachments
                             if (sm.attachments != null)
                             {
-                                foreach (attachments att in sm.attachments)
-                                {
-                                    gen.AddLinkContent(att.from_url);
+                                HandleAttachments(sm, gen);
+                                //foreach (attachments att in sm.attachments)
+                                //{
+                                //    gen.AddLinkContent(att.from_url);
 
-                                    if (!string.IsNullOrEmpty(att.fallback))
-                                    {
-                                        gen.AddContent("--  "+att.fallback, false, true);
-                                    }
-                                }
+                                //    if (!string.IsNullOrEmpty(att.fallback))
+                                //    {
+                                //        gen.AddContent("--  "+att.fallback, false, true);
+                                //    }
+                                //}
                             }
 
                             //Handle reactions
                             if (sm.reactions != null)
                             {
-                                foreach (Reaction re in sm.reactions)
-                                    gen.AddReactionContent(re);
+                                HandleReactions(sm, gen);
+                                //foreach (Reaction re in sm.reactions)
+                                //    gen.AddReactionContent(re);
                             }
                         }
                     }
@@ -284,7 +325,149 @@ namespace SlackReaderApp
             }
         }
 
-        void LoadEmoticons(string fileName)
+        private void HandleReplyThread(Reply r, List<SlackMessage> smList, HtmlGenerator gen, string dateMessage)
+        {
+            try
+            {
+                List<SlackMessage> smList2 = smList.Where(x => x.SubType != null && x.SubType.Equals("thread_broadcast")).ToList();
+
+                if (smList2 != null)
+                {
+                    foreach (SlackMessage sm in smList2)
+                    {
+                        if (sm.TS.Equals(r.ts))
+                        {
+                            double time = double.Parse(sm.TS);
+                            DateTime dt = UnixTimeStampToDateTime(time);
+
+                            //string name = string.Empty;
+                            UserName un;
+                            if (sm.User != null && m_UserDic.ContainsKey(sm.User))
+                            {
+                                un = m_UserDic[sm.User];
+                            }
+                            else
+                            {
+                                un = new UserName();
+                                un.Real_name = "NoName";
+                            }
+
+                            gen.AddContent("--Replies--" + un.Real_name + " " + dt.ToLongTimeString(), true, false);
+                            
+                            //TODO think of better way to show replies
+                            string outMessage = gen.AddContent("--         " + sm.Text, false, true);
+                            
+                            if (sm.files != null)  //.File != null) JSON format changed in may 2019
+                            {
+                                HandleFiles(sm, gen);
+                            }
+
+
+                            if (!string.IsNullOrEmpty(outMessage))
+                            {
+                                SetText(outMessage + "Date: " + dateMessage);
+                            }
+
+                            if (sm.attachments != null)
+                            {
+                                HandleAttachments(sm, gen);
+                            }
+
+                            if (sm.reactions != null)
+                            {
+                                HandleReactions(sm, gen);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SetText(ex.Message);
+            }
+        }
+
+        private void HandleFiles(SlackMessage sm, HtmlGenerator gen)
+        {
+            try
+            {
+                foreach (File f in sm.files)
+                {
+                    //change name of file as some has same name
+                    string name = f.name;
+                    string indexString = "_" + m_FileIndex++ + ".";
+                    name = name.Replace(".", indexString);
+
+                    if (f.mimetype.Contains("image"))// for test&& channelName.Equals("photos"))
+                    {
+                        //Download image
+
+                        string fileName = m_ImageFolder + "\\" + name;
+                        DownloadImage(f.url_private_download, fileName);
+
+                        SetText(string.Format("Downloading image {0}", fileName));
+
+
+                        string imageTag = string.Format("<img src='Images/{0}' width='{1}' height='{2}'>", name, f.thumb_360_w, f.thumb_360_h);
+                        gen.AddContent(f.title, false, false);
+                        gen.AddContent(imageTag, false, false);
+                        continue;
+                    }
+                    else
+                    {
+                        //file_share
+                        //Download other types
+                        string fileName = m_FilesFolder + "\\" + name;
+                        DownloadImage(f.url_private_download, fileName);
+
+                        SetText(string.Format("Downloading file {0}", fileName));
+
+                        gen.AddLinkContent(fileName);
+                        continue;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SetText(ex.Message);
+            }
+        }
+
+        private void HandleReactions(SlackMessage sm, HtmlGenerator gen)
+        {
+            try
+            {
+                foreach (Reaction re in sm.reactions)
+                    gen.AddReactionContent(re);
+            }
+            catch (Exception ex)
+            {
+                SetText(ex.Message);
+            }
+        }
+
+        private void HandleAttachments(SlackMessage sm, HtmlGenerator gen)
+        {
+            try
+            {
+                foreach (attachments att in sm.attachments)
+                {
+                    gen.AddLinkContent(att.from_url);
+
+                    if (!string.IsNullOrEmpty(att.fallback))
+                    {
+                        gen.AddContent("--  " + att.fallback, false, true);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SetText(ex.Message);
+            }
+        }
+
+        private void LoadEmoticons(string fileName)
         {
             //Create cheat sheet
             //foreach (string file in Directory.EnumerateFiles(fileName))
@@ -364,7 +547,6 @@ namespace SlackReaderApp
             return dtDateTime;
         }
 
-
         private void btnArchiveFolder_Click(object sender, EventArgs e)
         {
             try
@@ -401,7 +583,6 @@ namespace SlackReaderApp
                 SetText(ex.Message);
             }
         }
-
-       
+        
     }
 }

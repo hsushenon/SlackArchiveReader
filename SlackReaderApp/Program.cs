@@ -16,6 +16,7 @@ namespace SlackReaderApp
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            //Application.SetHighDpiMode(HighDpiMode.SystemAware); for high dpi
             Application.Run(new SlackReaderForm());
         }
     }
