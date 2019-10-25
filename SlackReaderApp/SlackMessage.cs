@@ -16,6 +16,7 @@ namespace SlackReaderApp
         public string Text { get; set; }
         //public attachments Attachments { get; set; }
         public string TS { get; set; }
+        public string Thread_ts { get; set; }
         public List<File> files { get; set; }
         public List<Reaction> reactions { get; set; }
         public List<attachments> attachments { get; set; }

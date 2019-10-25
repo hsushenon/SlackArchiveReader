@@ -105,7 +105,7 @@ namespace SlackReaderApp
                 m_GraphicsFolder = m_OutputFolderPath + "\\Graphics";
                 m_FilesFolder = m_OutputFolderPath + "\\Files";
 
-                if (!IS_DEBUG)
+                //if (!IS_DEBUG)
                 {
                     if (!Directory.Exists(m_ImageFolder))
                     {
@@ -183,7 +183,7 @@ namespace SlackReaderApp
 
                         foreach (SlackMessage sm in smList)
                         {
-                            if (sm.SubType != null && sm.SubType.Equals("thread_broadcast"))
+                            if (sm.Thread_ts != null && !sm.TS.Equals(sm.Thread_ts))
                             {
                                 continue;//as the message is in thread and handled separately.
                             }
@@ -235,7 +235,6 @@ namespace SlackReaderApp
                                 foreach (Reply r in sm.replies)
                                 {
                                     HandleReplyThread(r, smList, gen, dateMessage);
-
                                 }
                                 //Set last user to blank as need to set user name again after going through thread
                                 lastUser = string.Empty;
@@ -329,56 +328,53 @@ namespace SlackReaderApp
         {
             try
             {
-                List<SlackMessage> smList2 = smList.Where(x => x.SubType != null && x.SubType.Equals("thread_broadcast")).ToList();
+                List<SlackMessage> smList2 = smList.Where(x => x.Thread_ts != null && r.ts.Equals(x.TS)).ToList();
 
                 if (smList2 != null)
                 {
                     foreach (SlackMessage sm in smList2)
                     {
-                        if (sm.TS.Equals(r.ts))
+                        double time = double.Parse(sm.TS);
+                        DateTime dt = UnixTimeStampToDateTime(time);
+
+                        //string name = string.Empty;
+                        UserName un;
+                        if (sm.User != null && m_UserDic.ContainsKey(sm.User))
                         {
-                            double time = double.Parse(sm.TS);
-                            DateTime dt = UnixTimeStampToDateTime(time);
-
-                            //string name = string.Empty;
-                            UserName un;
-                            if (sm.User != null && m_UserDic.ContainsKey(sm.User))
-                            {
-                                un = m_UserDic[sm.User];
-                            }
-                            else
-                            {
-                                un = new UserName();
-                                un.Real_name = "NoName";
-                            }
-
-                            gen.AddContent("--Replies--" + un.Real_name + " " + dt.ToLongTimeString(), true, false);
-                            
-                            //TODO think of better way to show replies
-                            string outMessage = gen.AddContent("--         " + sm.Text, false, true);
-                            
-                            if (sm.files != null)  //.File != null) JSON format changed in may 2019
-                            {
-                                HandleFiles(sm, gen);
-                            }
-
-
-                            if (!string.IsNullOrEmpty(outMessage))
-                            {
-                                SetText(outMessage + "Date: " + dateMessage);
-                            }
-
-                            if (sm.attachments != null)
-                            {
-                                HandleAttachments(sm, gen);
-                            }
-
-                            if (sm.reactions != null)
-                            {
-                                HandleReactions(sm, gen);
-                            }
-                            break;
+                            un = m_UserDic[sm.User];
                         }
+                        else
+                        {
+                            un = new UserName();
+                            un.Real_name = "NoName";
+                        }
+
+                        gen.AddContent("--Replies--" + un.Real_name + " " + dt.ToLongTimeString(), true, false);
+
+                        //TODO think of better way to show replies
+                        string outMessage = gen.AddContent("--         " + sm.Text, false, true);
+
+                        if (sm.files != null)  //.File != null) JSON format changed in may 2019
+                        {
+                            HandleFiles(sm, gen);
+                        }
+
+
+                        if (!string.IsNullOrEmpty(outMessage))
+                        {
+                            SetText(outMessage + "Date: " + dateMessage);
+                        }
+
+                        if (sm.attachments != null)
+                        {
+                            HandleAttachments(sm, gen);
+                        }
+
+                        if (sm.reactions != null)
+                        {
+                            HandleReactions(sm, gen);
+                        }
+                        break;
                     }
                 }
             }
