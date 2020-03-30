@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Linq;
@@ -29,27 +28,21 @@ namespace SlackReaderApp
         delegate void StringArgReturningVoidDelegate(string text);
 
         const bool IS_DEBUG = false;//TODO set to false when deploy, change for when debug testing
-        
+        private static readonly log4net.ILog Log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
         public SlackReaderForm()
         {
             try
             {
-              
                 InitializeComponent();
-                
-                LoadEmoticons(m_EmoticonList);
+                ServicePointManager.Expect100Continue = true;
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-                //regex test
-                //string message = "asdasd:touge:sdasd";
-                //string pattern = @"(:)\S*(:)"; 
-                //Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
-                //bool hasEmoticon = rgx.IsMatch(message);
-                //if (hasEmoticon)
-                //{//
-                //}
+                LoadEmoticons(m_EmoticonList);
             }
             catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 SetText(ex.Message);
             }
         }
@@ -60,6 +53,8 @@ namespace SlackReaderApp
             {
                 txtMessage.Text = "Started...";
                 btnStart.Enabled = false;
+                Logger.LogInfo(Log, "Started");
+
                 if (!string.IsNullOrEmpty(txtArchiveFolder.Text))
                     m_ArchiveFolderPath = txtArchiveFolder.Text;
 
@@ -77,6 +72,7 @@ namespace SlackReaderApp
             }
             catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 SetText(ex.Message); 
             }
         }
@@ -105,29 +101,30 @@ namespace SlackReaderApp
                 m_GraphicsFolder = m_OutputFolderPath + "\\Graphics";
                 m_FilesFolder = m_OutputFolderPath + "\\Files";
 
-                //if (!IS_DEBUG)
+
+                if (!Directory.Exists(m_ImageFolder))
                 {
-                    if (!Directory.Exists(m_ImageFolder))
+                    Directory.CreateDirectory(m_ImageFolder);
+                }
+
+                if (!Directory.Exists(m_FilesFolder))
+                {
+                    Directory.CreateDirectory(m_FilesFolder);
+                }
+
+                if (!Directory.Exists(m_GraphicsFolder))
+                {
+                    //Check if the Graphics folder exist then copy it to output folder
+                    string graphicsSourceFolderPath = ".\\Graphics";
+                    if (!Directory.Exists(graphicsSourceFolderPath))
                     {
-                        Directory.CreateDirectory(m_ImageFolder);
+                        MessageBox.Show("Could not find the source graphics folder to copy from, please copy it manually to the output folder path");
+                        return;
                     }
-                    if (!Directory.Exists(m_FilesFolder))
+                    else
                     {
-                        Directory.CreateDirectory(m_FilesFolder);
-                    }
-                    if (!Directory.Exists(m_GraphicsFolder))
-                    {
-                        //Check if the Graphics folder exist then copy it to output folder
-                        string graphicsSourceFolderPath = ".\\Graphics";
-                        if (!Directory.Exists(graphicsSourceFolderPath))
-                        {
-                            MessageBox.Show("Could not find the graphics folder, please copy it to the output folder path");
-                            return;
-                        }
-                        else
-                        {
-                            Common.DirectoryCopy(graphicsSourceFolderPath, m_GraphicsFolder, false);
-                        }
+                        SetText("Copying graphics..");
+                        Common.DirectoryCopy(graphicsSourceFolderPath, m_GraphicsFolder, false);
                     }
                 }
 
@@ -161,8 +158,7 @@ namespace SlackReaderApp
                     HtmlGenerator gen = new HtmlGenerator(channelName, m_EmoticonDic, m_UserDic);
 
                     SetText(string.Format("Processing channel {0}..", channelName));
-
-                   
+                    
                     //Read messages
                     foreach (string file in Directory.EnumerateFiles(folder, "*.json"))
                     {
@@ -196,6 +192,10 @@ namespace SlackReaderApp
                             if (sm.User != null && m_UserDic.ContainsKey(sm.User))
                             {
                                 un = m_UserDic[sm.User];
+                                if(string.IsNullOrEmpty(un.Real_name))
+                                {
+                                    un.Real_name = "NoRealName";
+                                }
                             }
                             else  //There is no user set here, need special handling
                             {
@@ -320,6 +320,7 @@ namespace SlackReaderApp
             }
             catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 MessageBox.Show(ex.Message + ex.StackTrace);
             }
         }
@@ -380,6 +381,7 @@ namespace SlackReaderApp
             }
             catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 SetText(ex.Message);
             }
         }
@@ -426,6 +428,7 @@ namespace SlackReaderApp
             }
             catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 SetText(ex.Message);
             }
         }
@@ -439,6 +442,7 @@ namespace SlackReaderApp
             }
             catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 SetText(ex.Message);
             }
         }
@@ -459,6 +463,7 @@ namespace SlackReaderApp
             }
             catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 SetText(ex.Message);
             }
         }
@@ -529,8 +534,9 @@ namespace SlackReaderApp
                     client.DownloadFile(new Uri(url), fileName);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 SetText(string.Format("Could not download {0}", fileName));
             }
         }
@@ -558,6 +564,7 @@ namespace SlackReaderApp
             }
             catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 SetText(ex.Message);
             }
         }
@@ -576,6 +583,7 @@ namespace SlackReaderApp
             }
             catch (Exception ex)
             {
+                Logger.LogError(Log, ex);
                 SetText(ex.Message);
             }
         }

@@ -1,3 +1,12 @@
+Changelog for version 0.9 Date 28 Mar 2020
+1. Fix Object reference null error
+
+
+Changelog for version 0.8 Date 28 Mar 2020
+1. Don't stretch Start button. It should stay fixed sized.
+2. Added logging
+3. Fixed issue with image not downloading
+
 Changelog for version 0.7 Date 22 Oct 2019
 1. Don't stretch Start button. It should stay fixed sized.
 2. Image Title Missing

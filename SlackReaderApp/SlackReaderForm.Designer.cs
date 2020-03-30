@@ -132,8 +132,9 @@
             this.Controls.Add(this.txtMessage);
             this.Controls.Add(this.btnStart);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
+            this.MinimumSize = new System.Drawing.Size(600, 427);
             this.Name = "SlackReaderForm";
-            this.Text = "Slack reader v0.7";
+            this.Text = "Slack reader v0.9";
             this.ResumeLayout(false);
             this.PerformLayout();
 

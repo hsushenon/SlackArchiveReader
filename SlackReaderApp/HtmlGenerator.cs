@@ -13,6 +13,7 @@ namespace SlackReaderApp
 
         private Dictionary<string, string> m_EmoticonDic;
         private Dictionary<string, UserName> m_UserDic;
+        private static readonly log4net.ILog Log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         public HtmlGenerator(string title, Dictionary<string, string> emoDic, Dictionary<string, UserName> userDic)
         {
@@ -44,7 +45,8 @@ namespace SlackReaderApp
             //check for text formatting, italics,  e.g _really_  should be rendered as really in italics
             if (checkEmoticon)
             {
-                string pattern = @"\b(_)\S*(_)\b";//@"\:[a-z0-9_\+-]\+\:";
+                //string pattern = @"\b(_)\S*(_)\b";//@"\:[a-z0-9_\+-]\+\:";
+                string pattern = @"\b(_)\S*(_)\b";
                 Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
 
                 bool hasItalics = rgx.IsMatch(message);
@@ -91,7 +93,7 @@ namespace SlackReaderApp
                             for (int count = 0; count <= strArr.Length - 1; count++)
                             {   
                                 //ignore skin tone as is not supported
-                                if (string.IsNullOrEmpty(strArr[count]) || strArr[count].Contains("skin-tone"))
+                                if (string.IsNullOrEmpty(strArr[count]) || strArr[count].Contains("skin-tone") || strArr[count].Contains("/"))
                                     continue;
 
                                 string emoStrg = ":" + strArr[count] + ":";
@@ -172,8 +174,7 @@ namespace SlackReaderApp
             }
             catch (Exception ex)
             {
-                //TODO log message
-                //log4net
+                Logger.LogError(Log, ex);
                 outMessage = ex.Message;
             }
             return outMessage;
