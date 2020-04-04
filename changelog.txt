@@ -1,5 +1,11 @@
 Changelog for version 0.9 Date 28 Mar 2020
 1. Fix Object reference null error
+2. Fix issue with missing reply on future date
+3. Fix empty date issue
+4. Fix duplicate image download issue
+5. Fix file comment reply name issue
+6. Fix message formatting, italics, bold, underline
+7. Fix link detail issue
 
 
 Changelog for version 0.8 Date 28 Mar 2020

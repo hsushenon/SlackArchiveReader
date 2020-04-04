@@ -18,7 +18,7 @@ namespace SlackReaderApp
         string m_ImageFolder = string.Empty;
         string m_GraphicsFolder = string.Empty;
         string m_FilesFolder = string.Empty;
-        int m_FileIndex = 1;
+        //int m_FileIndex = 1;
 
         Dictionary<string, UserName> m_UserDic = new Dictionary<string, UserName>();
         private Dictionary<string, string> m_EmoticonDic;
@@ -73,7 +73,7 @@ namespace SlackReaderApp
             catch (Exception ex)
             {
                 Logger.LogError(Log, ex);
-                SetText(ex.Message); 
+                SetText(ex.Message);
             }
         }
 
@@ -95,7 +95,7 @@ namespace SlackReaderApp
         {
             try
             {
-                m_FileIndex = 1;
+                //m_FileIndex = 1;
                 //Create folder for image to download
                 m_ImageFolder = m_OutputFolderPath + "\\Images";
                 m_GraphicsFolder = m_OutputFolderPath + "\\Graphics";
@@ -139,7 +139,7 @@ namespace SlackReaderApp
                     if (!m_UserDic.ContainsKey(u.ID))
                         m_UserDic.Add(u.ID, un);
                 }
-                
+
 
                 //read channel folders
                 foreach (string folder in Directory.EnumerateDirectories(m_ArchiveFolderPath))
@@ -148,7 +148,7 @@ namespace SlackReaderApp
                     string channelName = folder.Substring(folder.LastIndexOf("\\") + 1);
 
                     string path = m_OutputFolderPath + @"\" + channelName + ".html";
-                    
+
                     // Delete the file if it exists.
                     if (System.IO.File.Exists(path))
                     {
@@ -158,7 +158,7 @@ namespace SlackReaderApp
                     HtmlGenerator gen = new HtmlGenerator(channelName, m_EmoticonDic, m_UserDic);
 
                     SetText(string.Format("Processing channel {0}..", channelName));
-                    
+
                     //Read messages
                     foreach (string file in Directory.EnumerateFiles(folder, "*.json"))
                     {
@@ -166,8 +166,8 @@ namespace SlackReaderApp
                         string dateMessage = file.Substring(file.LastIndexOf("\\") + 1).Replace(".json", "");
 
                         dateMessage = "---" + dateMessage + "---";
-                       
-                        gen.AddContent(dateMessage, true, false);
+
+                        //gen.AddContent(dateMessage, true, false);
 
                         string contents = System.IO.File.ReadAllText(file);
 
@@ -177,11 +177,19 @@ namespace SlackReaderApp
                         string lastUser = string.Empty;
                         DateTime lastMessageTime = DateTime.Now;
 
+                        bool addFirstMessage = false;
+
                         foreach (SlackMessage sm in smList)
                         {
                             if (sm.Thread_ts != null && !sm.TS.Equals(sm.Thread_ts))
                             {
                                 continue;//as the message is in thread and handled separately.
+                            }
+
+                            if (!addFirstMessage)
+                            {
+                                gen.AddContent(dateMessage, true, false, false);
+                                addFirstMessage = true;
                             }
 
                             double time = double.Parse(sm.TS);
@@ -192,28 +200,48 @@ namespace SlackReaderApp
                             if (sm.User != null && m_UserDic.ContainsKey(sm.User))
                             {
                                 un = m_UserDic[sm.User];
-                                if(string.IsNullOrEmpty(un.Real_name))
+                                if (string.IsNullOrEmpty(un.Real_name))
                                 {
                                     un.Real_name = "NoRealName";
                                 }
                             }
-                            else  //There is no user set here, need special handling
+                            else if (sm.SubType.Equals("file_comment") && !string.IsNullOrEmpty(sm.Text) && sm.Text.Length > 38)
+                            {
+                                //special handling to get user from comment
+                                //TODO change logic to use comment field
+                                string user = sm.Text.Substring(2, 9);
+                                if (m_UserDic.ContainsKey(user))
+                                {
+                                    un = m_UserDic[user];
+                                    string userTag = "<@" + user + ">";
+                                    string userFile = sm.Text.Substring(28, 9);
+                                    sm.Text = sm.Text.Replace(userTag, un.Real_name);
+
+                                    //Find comment on and replace user
+                                    if (m_UserDic.ContainsKey(userFile))
+                                    {
+                                        userTag = "<@" + userFile + ">";
+                                        sm.Text = sm.Text.Replace(userTag, m_UserDic[userFile].Real_name);
+                                    }
+                                }
+                                else
+                                {
+                                    un = new UserName();
+                                    un.Real_name = "NoName";
+                                }
+                            }
+                            else //There is no user set here, need special handling
                             {
                                 un = new UserName();
                                 un.Real_name = "NoName";
-                                //if (sm.SubType != null && sm.SubType.Equals("file_comment"))
-                                //{
-                                //    //TODO 
-                                //    continue;
-                                //}
                             }
 
-                            if (!un.Real_name.Equals(lastUser)  || dt.Subtract(lastMessageTime).TotalMinutes > 5)
+                            if (!un.Real_name.Equals(lastUser) || dt.Subtract(lastMessageTime).TotalMinutes > 5)
                             {
-                                gen.AddContent(un.Real_name + " " + dt.ToLongTimeString(), true, false);
+                                gen.AddContent(un.Real_name + " " + dt.ToLongTimeString(), true, false, false);
                                 lastUser = un.Real_name;
                             }
-                          
+
                             lastMessageTime = dt;
 
                             //special handling to replace userID with username when join 
@@ -225,63 +253,44 @@ namespace SlackReaderApp
                                     string currentText = string.Format("<@{0}|{1}>", sm.User, un.Name);
                                     sm.Text = sm.Text.Replace(currentText, un.Real_name);
                                 }
-                              
                             }
 
-                            string outMessage = gen.AddContent(sm.Text, false, true); //Move up as if text and file is there text is first then file
+                            string outMessage = gen.AddContent(sm.Text, false, true, true); //Move up as if text and file is there text is first then file
+
+                            if (sm.files != null)  //.File != null) JSON format changed in may 2019
+                            {
+                                HandleFiles(sm, gen);
+                            }
 
                             if (sm.replies != null)
                             {
                                 foreach (Reply r in sm.replies)
                                 {
-                                    HandleReplyThread(r, smList, gen, dateMessage);
+                                    double timer = double.Parse(r.ts);
+                                    DateTime dtr = UnixTimeStampToDateTime(timer);
+
+                                    //If the reply is on same date
+                                    if (dtr.Day == dt.Day && dtr.Month == dt.Month && dtr.Year == dt.Year)
+                                    {
+                                        HandleReplyThread(r, smList, gen, dateMessage);
+                                    }
+                                    else
+                                    {
+                                        string fileR = string.Format("{0}\\{1}-{2}-{3}.json", folder, dtr.Year, dtr.Month, dtr.Day);
+
+                                        if (System.IO.File.Exists(fileR))
+                                        {
+                                            string contentsr = System.IO.File.ReadAllText(fileR);
+
+                                            List<SlackMessage> smListr = JsonConvert.DeserializeObject<List<SlackMessage>>(contentsr);
+                                            HandleReplyThread(r, smListr, gen, dateMessage);
+                                        }
+                                    }
                                 }
                                 //Set last user to blank as need to set user name again after going through thread
                                 lastUser = string.Empty;
                             }
 
-                            if (sm.files != null)  //.File != null) JSON format changed in may 2019
-                            {
-                                HandleFiles(sm, gen);
-                                //TODO cleanup
-                                //foreach (File f in sm.files)
-                                //{
-                                //    //change name of file as some has same name
-                                //    string name = f.name;
-                                //    string indexString = "_" + m_FileIndex++ + ".";
-                                //    name = name.Replace(".", indexString);
-
-                                //    if (f.mimetype.Contains("image"))// for test&& channelName.Equals("photos"))
-                                //    {
-                                //        //Download image
-
-                                //        string fileName = m_ImageFolder + "\\" + name;
-                                //        DownloadImage(f.url_private_download, fileName);
-
-                                //        SetText(string.Format("Downloading image {0}", fileName));
-
-
-                                //        string imageTag = string.Format("<img src='Images/{0}' width='{1}' height='{2}'>", name, f.thumb_360_w, f.thumb_360_h);
-                                //        gen.AddContent(f.title, false, false);
-                                //        gen.AddContent(imageTag, false, false);
-                                //        continue;
-                                //    }
-                                //    else
-                                //    {
-                                //        //file_share
-                                //        //Download other types
-                                //        string fileName = m_FilesFolder + "\\" + name;
-                                //        DownloadImage(f.url_private_download, fileName);
-
-                                //        SetText(string.Format("Downloading file {0}", fileName));
-
-                                //        gen.AddLinkContent(fileName);
-                                //        continue;
-                                //    }
-                                //}
-                            }
-
-                            //string outMessage = gen.AddContent(sm.Text, false, true);
 
                             if (!string.IsNullOrEmpty(outMessage))
                             {
@@ -292,23 +301,12 @@ namespace SlackReaderApp
                             if (sm.attachments != null)
                             {
                                 HandleAttachments(sm, gen);
-                                //foreach (attachments att in sm.attachments)
-                                //{
-                                //    gen.AddLinkContent(att.from_url);
-
-                                //    if (!string.IsNullOrEmpty(att.fallback))
-                                //    {
-                                //        gen.AddContent("--  "+att.fallback, false, true);
-                                //    }
-                                //}
                             }
 
                             //Handle reactions
                             if (sm.reactions != null)
                             {
                                 HandleReactions(sm, gen);
-                                //foreach (Reaction re in sm.reactions)
-                                //    gen.AddReactionContent(re);
                             }
                         }
                     }
@@ -316,7 +314,6 @@ namespace SlackReaderApp
                     string fullContent = gen.GetFullContent();
                     System.IO.File.AppendAllText(path, fullContent);
                 }
-
             }
             catch (Exception ex)
             {
@@ -346,20 +343,48 @@ namespace SlackReaderApp
                         }
                         else
                         {
-                            un = new UserName();
-                            un.Real_name = "NoName";
+                            if (sm.SubType.Equals("file_comment") && !string.IsNullOrEmpty(sm.Text) && sm.Text.Length > 38)
+                            {
+                                //special handling to get user from comment
+                                //TODO change logic
+                                string user = sm.Text.Substring(2, 9);
+                                if (m_UserDic.ContainsKey(user))
+                                {
+                                    un = m_UserDic[user];
+                                    string userTag = "<@" + user + ">";
+                                    string userFile = sm.Text.Substring(28, 9);
+                                    sm.Text = sm.Text.Replace(userTag, un.Real_name);
+
+                                    //Find comment on and replace user
+                                    //string userFile = sm.Text.Substring(28, 9);
+                                    if (m_UserDic.ContainsKey(userFile))
+                                    {
+                                        userTag = "<@" + userFile + ">";
+                                        sm.Text = sm.Text.Replace(userTag, m_UserDic[userFile].Real_name);
+                                    }
+                                }
+                                else
+                                {
+                                    un = new UserName();
+                                    un.Real_name = "NoName";
+                                }
+                            }
+                            else
+                            {
+                                un = new UserName();
+                                un.Real_name = "NoName";
+                            }
                         }
 
-                        gen.AddContent("--Replies--" + un.Real_name + " " + dt.ToLongTimeString(), true, false);
+                        gen.AddContent("--Replies--" + un.Real_name + " " + dt.ToShortDateString() + " " + dt.ToLongTimeString(), true, false, false);
 
                         //TODO think of better way to show replies
-                        string outMessage = gen.AddContent("--         " + sm.Text, false, true);
+                        string outMessage = gen.AddContent("--         " + sm.Text, false, true, true);
 
                         if (sm.files != null)  //.File != null) JSON format changed in may 2019
                         {
                             HandleFiles(sm, gen);
                         }
-
 
                         if (!string.IsNullOrEmpty(outMessage))
                         {
@@ -393,23 +418,21 @@ namespace SlackReaderApp
                 foreach (File f in sm.files)
                 {
                     //change name of file as some has same name
-                    string name = f.name;
-                    string indexString = "_" + m_FileIndex++ + ".";
-                    name = name.Replace(".", indexString);
+                    string name = f.id + "_" + f.name;
+                    //string indexString = "_" + m_FileIndex++ + ".";
+                    //name = name.Replace(".", indexString);
 
                     if (f.mimetype.Contains("image"))// for test&& channelName.Equals("photos"))
                     {
                         //Download image
-
                         string fileName = m_ImageFolder + "\\" + name;
-                        DownloadImage(f.url_private_download, fileName);
 
+                        DownloadFile(f.url_private_download, fileName);
                         SetText(string.Format("Downloading image {0}", fileName));
 
-
                         string imageTag = string.Format("<img src='Images/{0}' width='{1}' height='{2}'>", name, f.thumb_360_w, f.thumb_360_h);
-                        gen.AddContent(f.title, false, false);
-                        gen.AddContent(imageTag, false, false);
+                        gen.AddContent(f.title, false, false, false);
+                        gen.AddContent(imageTag, false, false, false);
                         continue;
                     }
                     else
@@ -417,11 +440,11 @@ namespace SlackReaderApp
                         //file_share
                         //Download other types
                         string fileName = m_FilesFolder + "\\" + name;
-                        DownloadImage(f.url_private_download, fileName);
 
+                        DownloadFile(f.url_private_download, fileName);
                         SetText(string.Format("Downloading file {0}", fileName));
 
-                        gen.AddLinkContent(fileName);
+                        gen.AddLinkContent(fileName, fileName);
                         continue;
                     }
                 }
@@ -453,11 +476,11 @@ namespace SlackReaderApp
             {
                 foreach (attachments att in sm.attachments)
                 {
-                    gen.AddLinkContent(att.from_url);
+                    gen.AddLinkContent(att.title, att.from_url);
 
-                    if (!string.IsNullOrEmpty(att.fallback))
+                    if (!string.IsNullOrEmpty(att.text))
                     {
-                        gen.AddContent("--  " + att.fallback, false, true);
+                        gen.AddContent("--  " + att.text, false, false, false);
                     }
                 }
             }
@@ -476,8 +499,6 @@ namespace SlackReaderApp
             //    string fn = file.Substring(file.LastIndexOf("\\") + 1).Replace(".png", "");
             //    System.IO.File.AppendAllText(@"C:\Projects\My projects\SlackReaderApp\emoticonList.txt", fn + "\r\n");
             //}
-
-       
             var assembly = Assembly.GetExecutingAssembly();
             var resourceName = "SlackReaderApp.emoticonList.txt";
             m_EmoticonDic = new Dictionary<string, string>();
@@ -502,7 +523,7 @@ namespace SlackReaderApp
             //    while ((line = reader.ReadLine()) != null)
             //    {
             //        string value = string.Format("<img src='Graphics/{0}' width='16' height='16' />", line+".png");
-                    
+
             //        m_EmoticonDic.Add(":" + line + ":", value);
             //    }
             //}
@@ -521,17 +542,20 @@ namespace SlackReaderApp
             }
             else
             {
-                this.txtMessage.AppendText(text +"\r\n" );
+                this.txtMessage.AppendText(text + "\r\n");
             }
         }
 
-        private void DownloadImage(string url, string fileName)
+        private void DownloadFile(string url, string fileName)
         {
             try
             {
-                using (WebClient client = new WebClient())
+                if (!System.IO.File.Exists(fileName) && !string.IsNullOrEmpty(url))
                 {
-                    client.DownloadFile(new Uri(url), fileName);
+                    using (WebClient client = new WebClient())
+                    {
+                        client.DownloadFile(new Uri(url), fileName);
+                    }
                 }
             }
             catch (Exception ex)
@@ -545,7 +569,7 @@ namespace SlackReaderApp
         {
             // Unix timestamp is seconds past epoch
             System.DateTime dtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-            dtDateTime = dtDateTime.AddSeconds(unixTimeStamp).ToLocalTime();
+            dtDateTime = dtDateTime.AddSeconds(unixTimeStamp).ToUniversalTime();
             return dtDateTime;
         }
 
@@ -587,6 +611,5 @@ namespace SlackReaderApp
                 SetText(ex.Message);
             }
         }
-        
     }
 }

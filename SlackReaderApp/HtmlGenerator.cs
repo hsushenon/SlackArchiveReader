@@ -23,9 +23,7 @@ namespace SlackReaderApp
             m_EmoticonDic = emoDic;
             m_UserDic = userDic;
         }
-
-      
-
+        
         private void AddTemplateContent(string title)
         {
             m_FullContent = @"<!DOCTYPE html>
@@ -39,33 +37,10 @@ namespace SlackReaderApp
         }
 
         //To add more style
-        public string AddContent(string message, bool isBold, bool checkEmoticon)
+        public string AddContent(string message, bool isBold, bool checkEmoticon, bool checkTextFormatting)
         {
             string outMessage = String.Empty;
-            //check for text formatting, italics,  e.g _really_  should be rendered as really in italics
-            if (checkEmoticon)
-            {
-                //string pattern = @"\b(_)\S*(_)\b";//@"\:[a-z0-9_\+-]\+\:";
-                string pattern = @"\b(_)\S*(_)\b";
-                Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
-
-                bool hasItalics = rgx.IsMatch(message);
-                if (hasItalics)
-                {
-                    //Replace emoticon symbol with image
-
-                    MatchCollection mc = Regex.Matches(message, pattern);
-
-                    foreach (Match m in mc)
-                    {
-                        if (m.Value.Length > 2)
-                        {
-                            string word = m.Value.Substring(1, m.Value.Length - 2);
-                            message = message.Replace(m.Value, "<i>"+ word + "</i>");
-                        }
-                    }
-                }
-            }
+           
             //check for emoticon
             if (checkEmoticon)
             {
@@ -110,6 +85,69 @@ namespace SlackReaderApp
                     }
                 }
             }
+
+            //check for text formatting, italics,  e.g _really_  should be rendered as really in italics
+            if (checkTextFormatting)
+            {
+                //string pattern = @"\b(_)\S*(_)\b";
+                string pattern = @"[\s]+(_)[\s\S]*(_)[\s]+";
+                Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
+
+                bool hasItalics = rgx.IsMatch(message);
+                if (hasItalics)
+                {
+                    MatchCollection mc = Regex.Matches(message, pattern);
+
+                    foreach (Match m in mc)
+                    {
+                        if (m.Value.Length > 2)
+                        {
+                            string word = m.Value.Trim().Substring(1, m.Value.Trim().Length - 2);
+                            message = message.Replace(m.Value, "<i> " + word + " </i>");
+                        }
+                    }
+                }
+
+                //*your text* bold
+                //_sdfds sdf_ italics
+                //~your text~underline
+                pattern = @"[\s]+(\*)[\s\S]*(\*)[\s]+";
+                rgx = new Regex(pattern, RegexOptions.IgnoreCase);
+
+                bool hasbold = rgx.IsMatch(message);
+                if (hasbold)
+                {
+                    MatchCollection mc = Regex.Matches(message, pattern);
+
+                    foreach (Match m in mc)
+                    {
+                        if (m.Value.Length > 2)
+                        {
+                            string word = m.Value.Trim().Substring(1, m.Value.Trim().Length - 2);
+                            message = message.Replace(m.Value, "<b> " + word + " </b>");
+                        }
+                    }
+                }
+
+                pattern = @"[\s]+(~)[\s\S]*(~)[\s]+";
+                rgx = new Regex(pattern, RegexOptions.IgnoreCase);
+
+                bool hasUnderline = rgx.IsMatch(message);
+                if (hasUnderline)
+                {
+                    MatchCollection mc = Regex.Matches(message, pattern);
+
+                    foreach (Match m in mc)
+                    {
+                        if (m.Value.Length > 2)
+                        {
+                            string word = m.Value.Trim().Substring(1, m.Value.Trim().Length - 2);
+                            message = message.Replace(m.Value, "<u> " + word + " </u>");
+                        }
+                    }
+                }
+            }
+            
 
             //If message contain link, split the message
             if (message.Contains("<http"))
@@ -213,9 +251,9 @@ namespace SlackReaderApp
            m_Content.AppendLine(string.Format("<p><b>{0} {1}</b></p>", userName, reactionTag));
         }
         
-        public void AddLinkContent(string message)
+        public void AddLinkContent(string message, string url)
         {
-            m_Content.AppendLine(string.Format("<p><a href = '{0}' > {0} </a></p>", message));
+            m_Content.AppendLine(string.Format("<p><a href = '{0}' ><b> {1} </b> </a></p>", url, message));
         }
 
         public string GetFullContent()
