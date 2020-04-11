@@ -1,9 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.902
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SlackArchiveReader", "SlackReaderApp\SlackArchiveReader.csproj", "{A1D1E8DC-7CDC-4669-8959-3E0CF3A65C66}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lib", "Lib\Lib.csproj", "{254786E2-A621-4C21-B2F9-E3B0CE731D83}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SlackArchiveReaderConsoleApp", "SlackArchiveReaderConsoleApp\SlackArchiveReaderConsoleApp.csproj", "{34D571B5-802A-4621-8F58-330422B7DD62}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SlackArchiveTestProject", "SlackArchiveTestProject\SlackArchiveTestProject.csproj", "{669FA80F-3111-4934-86EC-3AB1657A10F2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,8 +21,23 @@ Global
 		{A1D1E8DC-7CDC-4669-8959-3E0CF3A65C66}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1D1E8DC-7CDC-4669-8959-3E0CF3A65C66}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1D1E8DC-7CDC-4669-8959-3E0CF3A65C66}.Release|Any CPU.Build.0 = Release|Any CPU
+		{254786E2-A621-4C21-B2F9-E3B0CE731D83}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{254786E2-A621-4C21-B2F9-E3B0CE731D83}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{254786E2-A621-4C21-B2F9-E3B0CE731D83}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{254786E2-A621-4C21-B2F9-E3B0CE731D83}.Release|Any CPU.Build.0 = Release|Any CPU
+		{34D571B5-802A-4621-8F58-330422B7DD62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34D571B5-802A-4621-8F58-330422B7DD62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{34D571B5-802A-4621-8F58-330422B7DD62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34D571B5-802A-4621-8F58-330422B7DD62}.Release|Any CPU.Build.0 = Release|Any CPU
+		{669FA80F-3111-4934-86EC-3AB1657A10F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{669FA80F-3111-4934-86EC-3AB1657A10F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{669FA80F-3111-4934-86EC-3AB1657A10F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{669FA80F-3111-4934-86EC-3AB1657A10F2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {23FE0ED7-664A-4F19-A591-BF1B056F62B5}
 	EndGlobalSection
 EndGlobal

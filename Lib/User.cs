@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace SlackReaderApp
+namespace Lib
 {
     public class User
     {

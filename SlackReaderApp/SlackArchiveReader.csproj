@@ -53,9 +53,21 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Common.cs" />
-    <Compile Include="HtmlGenerator.cs" />
-    <Compile Include="Logger.cs" />
+    <Compile Include="..\Lib\Common.cs">
+      <Link>Common.cs</Link>
+    </Compile>
+    <Compile Include="..\Lib\HtmlGenerator.cs">
+      <Link>HtmlGenerator.cs</Link>
+    </Compile>
+    <Compile Include="..\Lib\Logger.cs">
+      <Link>Logger.cs</Link>
+    </Compile>
+    <Compile Include="..\Lib\SlackMessage.cs">
+      <Link>SlackMessage.cs</Link>
+    </Compile>
+    <Compile Include="..\Lib\User.cs">
+      <Link>User.cs</Link>
+    </Compile>
     <Compile Include="SlackReaderForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -64,8 +76,6 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="User.cs" />
-    <Compile Include="SlackMessage.cs" />
     <EmbeddedResource Include="SlackReaderForm.resx">
       <DependentUpon>SlackReaderForm.cs</DependentUpon>
     </EmbeddedResource>

@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace SlackReaderApp
+namespace Lib
 {
-    class Common
+    public class Common
     {
         public static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
         {
@@ -45,6 +41,18 @@ namespace SlackReaderApp
                     DirectoryCopy(subdir.FullName, temppath, copySubDirs);
                 }
             }
+        }
+
+        //Coverts time stamp to date time, there is some issue with conversion so logic 
+        //needs to be rechecked as to how Slack does it
+        public static DateTime TimeStampToDateTime(double timeStamp)
+        {
+            // Unix timestamp is seconds past epoch
+            System.DateTime dtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
+            dtDateTime = dtDateTime.AddSeconds(timeStamp);//.ToUniversalTime();
+            //TODO Check correct algorithm, currently it seems its 4 hours earlier so, adjusting
+            dtDateTime = dtDateTime.AddHours(-4);
+            return dtDateTime;
         }
     }
 }

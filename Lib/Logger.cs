@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 
-namespace SlackReaderApp
+namespace Lib
 {
     public static class Logger
     {
@@ -10,7 +10,6 @@ namespace SlackReaderApp
             try
             {
                 //LogToFile(SessionDetail.UserName + ". " + ex.Message + ex.StackTrace);
-                //log.Error(SessionDetail.UserName + ". ", ex);
                 log.Error(ex);
             }
             catch (Exception e) { LogToFile(e.Message); }
@@ -30,7 +29,6 @@ namespace SlackReaderApp
         {
             try
             {
-                //log.Info(SessionDetail.UserName + ". " + message);
                 string m = message;
                 string combinedPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data/log.txt");
                 //using (StreamWriter w = File.AppendText(combinedPath))

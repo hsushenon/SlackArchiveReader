@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace SlackReaderApp
+
+namespace Lib
 {
     public class HtmlGenerator
     {
@@ -30,9 +31,17 @@ namespace SlackReaderApp
                               <html>
                                 <head>
                                     <title></title>
-                               </head>
+                                    <style>
+                                        body {
+                                              font-family: calibri;
+                                              font-size: 20px;
+                                              width: 50%;
+                                              margin: auto;
+                                             }
+                                    </style>
+                                    </head>
                                <body></body>
-                            </ html > ";
+                            </html > ";
             m_FullContent = m_FullContent.Replace("<title></title>", string.Format("<title>{0}</title>", title));
         }
 
@@ -207,6 +216,7 @@ namespace SlackReaderApp
                     }
 
                 } while (hasHttp);
+
                 fullMessage.Append("</p>");
                 m_Content.AppendLine(string.Format("<p>{0}</p>", fullMessage.ToString()));
             }
@@ -248,6 +258,7 @@ namespace SlackReaderApp
                     }
                 }
             }
+
            m_Content.AppendLine(string.Format("<p><b>{0} {1}</b></p>", userName, reactionTag));
         }
         

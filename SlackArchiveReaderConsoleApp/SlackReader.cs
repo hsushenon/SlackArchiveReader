@@ -1,18 +1,15 @@
-﻿using Newtonsoft.Json;
+﻿using Lib;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Reflection;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Linq;
-using Lib;
 
-namespace SlackReaderApp
+namespace SlackArchiveReaderConsoleApp
 {
-    //Use Console application, new improvements all added there
-    public partial class SlackReaderForm : Form
+    class SlackReader
     {
         string m_OutputFolderPath = @"C:\Projects\My projects\SlackReaderApp\Output\";
         string m_ArchiveFolderPath = @"C:\Projects\My projects\SlackReaderApp\BowbazarSlackExportJun2017_Test2\";
@@ -20,27 +17,26 @@ namespace SlackReaderApp
         string m_ImageFolder = string.Empty;
         string m_GraphicsFolder = string.Empty;
         string m_FilesFolder = string.Empty;
-        //int m_FileIndex = 1;
-
+        
         Dictionary<string, UserName> m_UserDic = new Dictionary<string, UserName>();
         private Dictionary<string, string> m_EmoticonDic;
-        string m_EmoticonList = @"C:\Projects\My projects\SlackReaderApp\emoticonList.txt";
+      
         // This delegate enables asynchronous calls for setting  
         // the text property on a TextBox control.  
         delegate void StringArgReturningVoidDelegate(string text);
 
-        const bool IS_DEBUG = false;//TODO set to false when deploy, change for when debug testing
+        bool m_DownloadFiles = true;
+
         private static readonly log4net.ILog Log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
-        public SlackReaderForm()
+        public void Load()
         {
             try
             {
-                InitializeComponent();
                 ServicePointManager.Expect100Continue = true;
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-                LoadEmoticons(m_EmoticonList);
+                LoadEmoticons();
             }
             catch (Exception ex)
             {
@@ -48,29 +44,24 @@ namespace SlackReaderApp
                 SetText(ex.Message);
             }
         }
-
-        private void btnStart_Click(object sender, EventArgs e)
+        
+        private void LoadEmoticons()
         {
             try
             {
-                txtMessage.Text = "Started...";
-                btnStart.Enabled = false;
-                Logger.LogInfo(Log, "Started");
-
-                if (!string.IsNullOrEmpty(txtArchiveFolder.Text))
-                    m_ArchiveFolderPath = txtArchiveFolder.Text;
-
-                if (!string.IsNullOrEmpty(txtOutputFolder.Text))
-                    m_OutputFolderPath = txtOutputFolder.Text;
-
-                Task t = Task.Factory.StartNew(()
-                                    => Start());
-                t.ContinueWith(
-                               (antecedent) =>
-                               {
-                                   End();
-                               }
-                             );
+                var assembly = Assembly.GetExecutingAssembly();
+                var resourceName = "SlackArchiveReaderConsoleApp.emoticonList.txt";
+                m_EmoticonDic = new Dictionary<string, string>();
+                using (Stream stream = assembly.GetManifestResourceStream(resourceName))
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        string value = string.Format("<img src='Graphics/{0}' width='16' height='16' />", line + ".png");
+                        m_EmoticonDic.Add(":" + line + ":", value);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -78,31 +69,19 @@ namespace SlackReaderApp
                 SetText(ex.Message);
             }
         }
-
-        private void End()
+        
+        public bool Start(string archiveFolderPath, string outputFolderPath, bool downloadFiles)
         {
-            if (this.InvokeRequired)
-            {
-                this.BeginInvoke(new Action(this.End));
-                return;
-            }
-            else
-            {
-                this.txtMessage.AppendText("Done.");
-                btnStart.Enabled = true;
-            }
-        }
-
-        private void Start()
-        {
+            bool success = false;
             try
             {
-                //m_FileIndex = 1;
-                //Create folder for image to download
+                m_DownloadFiles = downloadFiles;
+                m_OutputFolderPath = outputFolderPath;
+                m_ArchiveFolderPath = archiveFolderPath;
                 m_ImageFolder = m_OutputFolderPath + "\\Images";
                 m_GraphicsFolder = m_OutputFolderPath + "\\Graphics";
                 m_FilesFolder = m_OutputFolderPath + "\\Files";
-
+                m_UsersFilerPath = m_ArchiveFolderPath + "\\users.json";
 
                 if (!Directory.Exists(m_ImageFolder))
                 {
@@ -120,8 +99,7 @@ namespace SlackReaderApp
                     string graphicsSourceFolderPath = ".\\Graphics";
                     if (!Directory.Exists(graphicsSourceFolderPath))
                     {
-                        MessageBox.Show("Could not find the source graphics folder to copy from, please copy it manually to the output folder path");
-                        return;
+                        Console.Write("Could not find the source graphics folder to copy from, please copy it manually to the output folder path");
                     }
                     else
                     {
@@ -129,6 +107,8 @@ namespace SlackReaderApp
                         Common.DirectoryCopy(graphicsSourceFolderPath, m_GraphicsFolder, false);
                     }
                 }
+
+                Log.Info("Archiving started.");
 
                 //read users
                 string users = System.IO.File.ReadAllText(m_UsersFilerPath);
@@ -141,8 +121,7 @@ namespace SlackReaderApp
                     if (!m_UserDic.ContainsKey(u.ID))
                         m_UserDic.Add(u.ID, un);
                 }
-
-
+                
                 //read channel folders
                 foreach (string folder in Directory.EnumerateDirectories(m_ArchiveFolderPath))
                 {
@@ -168,9 +147,7 @@ namespace SlackReaderApp
                         string dateMessage = file.Substring(file.LastIndexOf("\\") + 1).Replace(".json", "");
 
                         dateMessage = "---" + dateMessage + "---";
-
-                        //gen.AddContent(dateMessage, true, false);
-
+                        
                         string contents = System.IO.File.ReadAllText(file);
 
                         List<SlackMessage> smList = JsonConvert.DeserializeObject<List<SlackMessage>>(contents);
@@ -195,7 +172,7 @@ namespace SlackReaderApp
                             }
 
                             double time = double.Parse(sm.TS);
-                            DateTime dt = UnixTimeStampToDateTime(time);
+                            DateTime dt = Common.TimeStampToDateTime(time);
 
                             //string name = string.Empty;
                             UserName un;
@@ -259,7 +236,7 @@ namespace SlackReaderApp
 
                             string outMessage = gen.AddContent(sm.Text, false, true, true); //Move up as if text and file is there text is first then file
 
-                            if (sm.files != null)  //.File != null) JSON format changed in may 2019
+                            if (sm.files != null && m_DownloadFiles)  //.File != null) JSON format changed in may 2019
                             {
                                 HandleFiles(sm, gen);
                             }
@@ -269,7 +246,7 @@ namespace SlackReaderApp
                                 foreach (Reply r in sm.replies)
                                 {
                                     double timer = double.Parse(r.ts);
-                                    DateTime dtr = UnixTimeStampToDateTime(timer);
+                                    DateTime dtr = Common.TimeStampToDateTime(timer);
 
                                     //If the reply is on same date
                                     if (dtr.Day == dt.Day && dtr.Month == dt.Month && dtr.Year == dt.Year)
@@ -278,15 +255,78 @@ namespace SlackReaderApp
                                     }
                                     else
                                     {
-                                        string fileR = string.Format("{0}\\{1}-{2}-{3}.json", folder, dtr.Year, dtr.Month, dtr.Day);
+                                        //TODO special handling as the date of the correct reply thread is not resolve satisfactorily
+                                        //If not found we check one day before and after also
+                                        bool found = false;
+                                        //For day which is on 9th or earlier, it is 09
+                                        string mm = dtr.Month.ToString();
+                                        string dd = dtr.Day.ToString();
+                                        if (dtr.Month <= 9)
+                                            mm = "0" + mm;
+                                        if (dtr.Day <= 9)
+                                            dd = "0" + dd;
+
+                                        string fileR = string.Format("{0}\\{1}-{2}-{3}.json", folder, dtr.Year, mm, dd);
 
                                         if (System.IO.File.Exists(fileR))
                                         {
                                             string contentsr = System.IO.File.ReadAllText(fileR);
 
                                             List<SlackMessage> smListr = JsonConvert.DeserializeObject<List<SlackMessage>>(contentsr);
-                                            HandleReplyThread(r, smListr, gen, dateMessage);
+                                            found = HandleReplyThread(r, smListr, gen, dateMessage);
                                         }
+
+                                        if (!found)
+                                        {
+                                            DateTime replyDate = dtr.AddDays(-1);
+                                            //For day which is on 9th or earlier, it is 09
+                                            mm = replyDate.Month.ToString();
+                                            dd = replyDate.Day.ToString();
+                                            if (replyDate.Month <= 9)
+                                                mm = "0" + mm;
+                                            if (replyDate.Day <= 9)
+                                                dd = "0" + dd;
+
+                                            fileR = string.Format("{0}\\{1}-{2}-{3}.json", folder, replyDate.Year, mm, dd);
+
+                                            if (System.IO.File.Exists(fileR))
+                                            {
+                                                string contentsr = System.IO.File.ReadAllText(fileR);
+
+                                                List<SlackMessage> smListr = JsonConvert.DeserializeObject<List<SlackMessage>>(contentsr);
+                                                found = HandleReplyThread(r, smListr, gen, dateMessage);
+                                            }
+
+                                            if (!found)
+                                            {
+                                                replyDate = dtr.AddDays(1);
+                                                //For day which is on 9th or earlier, it is 09
+                                                mm = replyDate.Month.ToString();
+                                                dd = replyDate.Day.ToString();
+                                                if (replyDate.Month <= 9)
+                                                    mm = "0" + mm;
+                                                if (replyDate.Day <= 9)
+                                                    dd = "0" + dd;
+
+                                                fileR = string.Format("{0}\\{1}-{2}-{3}.json", folder, replyDate.Year, mm, dd);
+
+                                                if (System.IO.File.Exists(fileR))
+                                                {
+                                                    string contentsr = System.IO.File.ReadAllText(fileR);
+
+                                                    List<SlackMessage> smListr = JsonConvert.DeserializeObject<List<SlackMessage>>(contentsr);
+                                                    found = HandleReplyThread(r, smListr, gen, dateMessage);
+
+                                                    if (!found)
+                                                    {
+                                                        string message = "Reply not found. Date: " + dateMessage + "Channel:" + channelName;
+                                                        Log.Info(message);
+                                                        SetText(message);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
                                     }
                                 }
                                 //Set last user to blank as need to set user name again after going through thread
@@ -316,28 +356,31 @@ namespace SlackReaderApp
                     string fullContent = gen.GetFullContent();
                     System.IO.File.AppendAllText(path, fullContent);
                 }
+                success = true;
             }
             catch (Exception ex)
             {
                 Logger.LogError(Log, ex);
-                MessageBox.Show(ex.Message + ex.StackTrace);
+                SetText(ex.Message);
             }
+            return success;
         }
 
-        private void HandleReplyThread(Reply r, List<SlackMessage> smList, HtmlGenerator gen, string dateMessage)
+        private bool HandleReplyThread(Reply r, List<SlackMessage> smList, HtmlGenerator gen, string dateMessage)
         {
+            bool found = false;
             try
             {
                 List<SlackMessage> smList2 = smList.Where(x => x.Thread_ts != null && r.ts.Equals(x.TS)).ToList();
 
                 if (smList2 != null)
                 {
+                    found = true;
                     foreach (SlackMessage sm in smList2)
                     {
                         double time = double.Parse(sm.TS);
-                        DateTime dt = UnixTimeStampToDateTime(time);
+                        DateTime dt = Common.TimeStampToDateTime(time);
 
-                        //string name = string.Empty;
                         UserName un;
                         if (sm.User != null && m_UserDic.ContainsKey(sm.User))
                         {
@@ -383,7 +426,7 @@ namespace SlackReaderApp
                         //TODO think of better way to show replies
                         string outMessage = gen.AddContent("--         " + sm.Text, false, true, true);
 
-                        if (sm.files != null)  //.File != null) JSON format changed in may 2019
+                        if (sm.files != null && m_DownloadFiles)  //.File != null) JSON format changed in may 2019
                         {
                             HandleFiles(sm, gen);
                         }
@@ -411,6 +454,7 @@ namespace SlackReaderApp
                 Logger.LogError(Log, ex);
                 SetText(ex.Message);
             }
+            return found;
         }
 
         private void HandleFiles(SlackMessage sm, HtmlGenerator gen)
@@ -421,9 +465,7 @@ namespace SlackReaderApp
                 {
                     //change name of file as some has same name
                     string name = f.id + "_" + f.name;
-                    //string indexString = "_" + m_FileIndex++ + ".";
-                    //name = name.Replace(".", indexString);
-
+                 
                     if (f.mimetype.Contains("image"))// for test&& channelName.Equals("photos"))
                     {
                         //Download image
@@ -492,62 +534,7 @@ namespace SlackReaderApp
                 SetText(ex.Message);
             }
         }
-
-        private void LoadEmoticons(string fileName)
-        {
-            //Create cheat sheet
-            //foreach (string file in Directory.EnumerateFiles(fileName))
-            //{
-            //    string fn = file.Substring(file.LastIndexOf("\\") + 1).Replace(".png", "");
-            //    System.IO.File.AppendAllText(@"C:\Projects\My projects\SlackReaderApp\emoticonList.txt", fn + "\r\n");
-            //}
-            var assembly = Assembly.GetExecutingAssembly();
-            var resourceName = "SlackReaderApp.emoticonList.txt";
-            m_EmoticonDic = new Dictionary<string, string>();
-            using (Stream stream = assembly.GetManifestResourceStream(resourceName))
-            using (StreamReader reader = new StreamReader(stream))
-            {
-                //string result = reader.ReadToEnd();
-                string line;
-                while ((line = reader.ReadLine()) != null)
-                {
-                    string value = string.Format("<img src='Graphics/{0}' width='16' height='16' />", line + ".png");
-
-                    m_EmoticonDic.Add(":" + line + ":", value);
-                }
-            }
-
-
-            //m_EmoticonDic = new Dictionary<string, string>();
-            //using (var reader = new StreamReader(fileName))
-            //{
-            //    string line;
-            //    while ((line = reader.ReadLine()) != null)
-            //    {
-            //        string value = string.Format("<img src='Graphics/{0}' width='16' height='16' />", line+".png");
-
-            //        m_EmoticonDic.Add(":" + line + ":", value);
-            //    }
-            //}
-
-        }
-
-        private void SetText(string text)
-        {
-            // InvokeRequired required compares the thread ID of the  
-            // calling thread to the thread ID of the creating thread.  
-            // If these threads are different, it returns true.  
-            if (this.txtMessage.InvokeRequired)
-            {
-                StringArgReturningVoidDelegate d = new StringArgReturningVoidDelegate(SetText);
-                this.Invoke(d, new object[] { text });
-            }
-            else
-            {
-                this.txtMessage.AppendText(text + "\r\n");
-            }
-        }
-
+        
         private void DownloadFile(string url, string fileName)
         {
             try
@@ -566,51 +553,21 @@ namespace SlackReaderApp
                 SetText(string.Format("Could not download {0}", fileName));
             }
         }
-
-        private DateTime UnixTimeStampToDateTime(double unixTimeStamp)
+        
+        private void SetText(string text)
         {
-            // Unix timestamp is seconds past epoch
-            System.DateTime dtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-            dtDateTime = dtDateTime.AddSeconds(unixTimeStamp).ToUniversalTime();
-            return dtDateTime;
-        }
-
-        private void btnArchiveFolder_Click(object sender, EventArgs e)
-        {
-            try
+            // InvokeRequired required compares the thread ID of the  
+            // calling thread to the thread ID of the creating thread.  
+            // If these threads are different, it returns true.  
+            //if (this.txtMessage.InvokeRequired)
             {
-                FolderBrowserDialog folderBrowserDialog1 = new FolderBrowserDialog();
-                DialogResult result = folderBrowserDialog1.ShowDialog();
-                if (result == DialogResult.OK)
-                {
-                    m_ArchiveFolderPath = folderBrowserDialog1.SelectedPath;
-                    txtArchiveFolder.Text = m_ArchiveFolderPath;
-                    m_UsersFilerPath = m_ArchiveFolderPath + "\\users.json";
-                }
+                //StringArgReturningVoidDelegate d = new StringArgReturningVoidDelegate(SetText);
+                //this.Invoke(d, new object[] { text });
             }
-            catch (Exception ex)
+            //else
             {
-                Logger.LogError(Log, ex);
-                SetText(ex.Message);
-            }
-        }
-
-        private void btnOutputFolder_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                FolderBrowserDialog folderBrowserDialog1 = new FolderBrowserDialog();
-                DialogResult result = folderBrowserDialog1.ShowDialog();
-                if (result == DialogResult.OK)
-                {
-                    m_OutputFolderPath = folderBrowserDialog1.SelectedPath;
-                    txtOutputFolder.Text = m_OutputFolderPath;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(Log, ex);
-                SetText(ex.Message);
+                Console.WriteLine(text);
+                //this.txtMessage.AppendText(text + "\r\n");
             }
         }
     }
