@@ -49,135 +49,185 @@ namespace Lib
         public string AddContent(string message, bool isBold, bool checkEmoticon, bool checkTextFormatting)
         {
             string outMessage = String.Empty;
-           
-            //check for emoticon
-            if (checkEmoticon)
+            try
             {
-                string pattern = @"(:)\S*(:)";//@"\:[a-z0-9_\+-]\+\:";
-                Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
-                
-                bool hasEmoticon = rgx.IsMatch(message);
-                if (hasEmoticon)
+                //check for emoticon
+                if (checkEmoticon)
                 {
-                    //Replace emoticon symbol with image
+                    HandleEmoticons(ref message, ref outMessage);
+                }
 
-                    MatchCollection mc = Regex.Matches(message, pattern);
+                //check for text formatting, italics,  e.g _really_  should be rendered as really in italics
+                if (checkTextFormatting)
+                {
+                    //For italics
+                    //For one word
+                    string pattern = @"[.,;?\s](_)\S*(_)[.,;?\s]";
+                    char splChar = '_';
+                    HandleTextFormatting(ref message, splChar, pattern, "<i>", "</i>");
 
-                    foreach (Match m in mc)
+                    //For multiple words
+                    pattern = @"[.,;?\s](_)[\S\s]*(_)[.,;?\s]";
+                    HandleTextFormatting(ref message, splChar, pattern, "<i>", "</i>");
+
+                    //For bold
+                    //For one word
+                    pattern = @"[.,;?\s](\*)\S*(\*)[.,;?\s]";
+                    splChar = '*';
+                    HandleTextFormatting(ref message, splChar, pattern, "<b>", "</b>");
+
+                    //For multiple words
+                    //TODO one case is not handled properly is when there are two or more series of multi words.
+                    pattern = @"[.,;?\s](\*)[\S\s]*(\*)[.,;?\s]";
+                    HandleTextFormatting(ref message, splChar, pattern, "<b>", "</b>");
+
+                    //For underline
+                    //For one word
+                    pattern = @"[.,;?\s](~)\S*(~)[.,;?\s]";
+                    splChar = '~';
+                    HandleTextFormatting(ref message, splChar, pattern, "<u>", "</u>");
+
+                    //For multiple words
+                    pattern = @"[.,;?\s](~)[\S\s]*(~)[.,;?\s]";
+                    HandleTextFormatting(ref message, splChar, pattern, "<u>", "</u>");
+
+                    HandleAtUserText(ref message);
+                }
+
+                //If message contain link, split the message
+                if (message.Contains("<http"))
+                {
+                    string m = HandleMessageWithLink(message);
+                    if (!string.IsNullOrEmpty(m))
+                        outMessage += m;
+                }
+                else
+                {
+                    if (isBold)
                     {
-                        if (m_EmoticonDic.ContainsKey(m.Value))
-                        {
-                            message = message.Replace(m.Value, m_EmoticonDic[m.Value]);
-                        }
-                        else
-                        {
-                            //case of multiple empoticon together like :-1::-1:
-                            char[] splitchar = { ':' };
-                            string[] strArr = m.Value.Split(splitchar);
-                            for (int count = 0; count <= strArr.Length - 1; count++)
-                            {   
-                                //ignore skin tone as is not supported
-                                if (string.IsNullOrEmpty(strArr[count]) || strArr[count].Contains("skin-tone") || strArr[count].Contains("/"))
-                                    continue;
+                        m_Content.AppendLine(string.Format("<p><b>{0}</b></p>", message));
+                    }
+                    else
+                    {
+                        m_Content.AppendLine(string.Format("<p>{0}</p>", message));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(Log, ex);
+                outMessage = ex.Message;
+            }
+            return outMessage;
+        }
 
-                                string emoStrg = ":" + strArr[count] + ":";
-                                if (m_EmoticonDic.ContainsKey(emoStrg))
-                                {
-                                    message = message.Replace(emoStrg, m_EmoticonDic[emoStrg]);
-                                }
-                                else
-                                {
-                                    outMessage += " Emoticon not translated: " + emoStrg;
-                                }
+        private void HandleEmoticons(ref string message, ref string outMessage)
+        {
+            string pattern = @"(:)\S*(:)";
+            Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
+
+            bool hasEmoticon = rgx.IsMatch(message);
+            if (hasEmoticon)
+            {
+                //Replace emoticon symbol with image
+                MatchCollection mc = Regex.Matches(message, pattern);
+
+                foreach (Match m in mc)
+                {
+                    if (m_EmoticonDic.ContainsKey(m.Value))
+                    {
+                        message = message.Replace(m.Value, m_EmoticonDic[m.Value]);
+                    }
+                    else
+                    {
+                        //case of multiple emoticon together like :-1::-1:
+                        char[] splitchar = { ':' };
+                        string[] strArr = m.Value.Split(splitchar);
+                        for (int count = 0; count <= strArr.Length - 1; count++)
+                        {
+                            //ignore skin tone as is not supported
+                            if (string.IsNullOrEmpty(strArr[count]) || strArr[count].Contains("skin-tone") || strArr[count].Contains("/"))
+                                continue;
+
+                            string emoStrg = ":" + strArr[count] + ":";
+                            if (m_EmoticonDic.ContainsKey(emoStrg))
+                            {
+                                message = message.Replace(emoStrg, m_EmoticonDic[emoStrg]);
+                            }
+                            else
+                            {
+                                outMessage += " Emoticon not translated: " + emoStrg;
                             }
                         }
                     }
                 }
             }
+        }
 
-            //check for text formatting, italics,  e.g _really_  should be rendered as really in italics
-            if (checkTextFormatting)
+        /// <summary>
+        /// To check if the text has formatting like bold, underline, italics
+        /// e.g _really_  should be rendered as 'really' in italics. *your text* bold. ~your text~ underline
+        /// </summary>
+        /// <param name="message">text</param>
+        /// <param name="specialChar">Character to identify which format to use</param>
+        /// <param name="pattern">regex pattern to identify the special text which needs formatting</param>
+        /// <param name="startSplTag">the html start tag for formatting</param>
+        /// <param name="endSplTag">the html end tag</param>
+        private void HandleTextFormatting(ref string message, char specialChar, string pattern,
+            string startSplTag, string endSplTag)
+        {
+            Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
+
+            bool found = rgx.IsMatch(message);
+            if (found)
             {
-                //string pattern = @"\b(_)\S*(_)\b";
-                string pattern = @"[\s]+(_)[\s\S]*(_)[\s]+";
-                Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
+                MatchCollection mc = Regex.Matches(message, pattern);
 
-                bool hasItalics = rgx.IsMatch(message);
-                if (hasItalics)
+                foreach (Match m in mc)
                 {
-                    MatchCollection mc = Regex.Matches(message, pattern);
-
-                    foreach (Match m in mc)
-                    {
-                        if (m.Value.Length > 2)
-                        {
-                            string word = m.Value.Trim().Substring(1, m.Value.Trim().Length - 2);
-                            message = message.Replace(m.Value, "<i> " + word + " </i>");
-                        }
+                    if (m.Value.Length > 2)
+                    { 
+                        //Extract the text to be formatted
+                        int startInd = m.Value.IndexOf(specialChar);
+                        int endInd = m.Value.LastIndexOf(specialChar);
+                        string text = m.Value.Substring(startInd, endInd - startInd + 1 );
+                        string replaceText = text.TrimStart(specialChar).TrimEnd(specialChar);
+                        message = message.Replace(text, startSplTag + replaceText + endSplTag);
                     }
-                }
-
-                //*your text* bold
-                //_sdfds sdf_ italics
-                //~your text~underline
-                pattern = @"[\s]+(\*)[\s\S]*(\*)[\s]+";
-                rgx = new Regex(pattern, RegexOptions.IgnoreCase);
-
-                bool hasbold = rgx.IsMatch(message);
-                if (hasbold)
-                {
-                    MatchCollection mc = Regex.Matches(message, pattern);
-
-                    foreach (Match m in mc)
+                    else
                     {
-                        if (m.Value.Length > 2)
-                        {
-                            string word = m.Value.Trim().Substring(1, m.Value.Trim().Length - 2);
-                            message = message.Replace(m.Value, "<b> " + word + " </b>");
-                        }
-                    }
-                }
-
-                pattern = @"[\s]+(~)[\s\S]*(~)[\s]+";
-                rgx = new Regex(pattern, RegexOptions.IgnoreCase);
-
-                bool hasUnderline = rgx.IsMatch(message);
-                if (hasUnderline)
-                {
-                    MatchCollection mc = Regex.Matches(message, pattern);
-
-                    foreach (Match m in mc)
-                    {
-                        if (m.Value.Length > 2)
-                        {
-                            string word = m.Value.Trim().Substring(1, m.Value.Trim().Length - 2);
-                            message = message.Replace(m.Value, "<u> " + word + " </u>");
-                        }
+                        Logger.LogInfo(Log, $"@{m.Value} could not be formatted correctly.");
                     }
                 }
             }
-            
+        }
 
-            //If message contain link, split the message
-            if (message.Contains("<http"))
-            {
-                string m = HandleMessageWithLink(message);
-                if (!string.IsNullOrEmpty(m))
-                    outMessage += m;
-            }
-            else
-            {
-                if (isBold)
-                {
-                    m_Content.AppendLine(string.Format("<p><b>{0}</b></p>", message));
-                }
-                else
-                {
-                    m_Content.AppendLine(string.Format("<p>{0}</p>", message));
-                }
-            }
+        //To check if the text has @UserID in it, if so replace by @UserName, 
+        //like <@U0535FH0Q> should be replace by @ronald
+        private void HandleAtUserText(ref string message)
+        {
+            string pattern = @"(<@)\S*(>)";
+            Regex rgx = new Regex(pattern, RegexOptions.IgnoreCase);
 
-            return outMessage;
+            bool hasAtUser = rgx.IsMatch(message);
+            if (hasAtUser)
+            {
+                //Replace userid with username
+                MatchCollection mc = Regex.Matches(message, pattern);
+
+                foreach (Match m in mc)
+                {
+                    string userID = m.Value.Replace("<@","").Replace(">","");
+                    if (m_UserDic.ContainsKey(userID))
+                    {
+                        message = message.Replace(m.Value, "@" + m_UserDic[userID].Real_name);
+                    }
+                    else
+                    {
+                        Logger.LogInfo(Log, $"@{userID} not found to be replace the name" );
+                    }
+                }
+            }
         }
 
         private string HandleMessageWithLink(string message)

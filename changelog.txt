@@ -1,3 +1,14 @@
+
+Changelog for version 1.1 Date 16 Apr 2020
+1. Upgrade .NET Core version to 3.1
+2. Fix so that when 'DownloadFiles' is false, only download of files is disable not the link to file in output
+3. Fix issue with unending italics text
+4. Fix date time issue
+5. Fix to translate @userid to @username
+6. Fix to format italics 
+7. Save processing log in output folder
+8. Added StartDate and EndDate for archiving dates.
+
 Changelog for version 1.0 Date 8 Apr 2020
 1. Create .NET Core version of application
 2. Add 'DownloadFiles' flag in config file to enable/disable download of image/file 

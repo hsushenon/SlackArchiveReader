@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System;
+using System.Globalization;
 using System.IO;
 
 [assembly: log4net.Config.XmlConfigurator(ConfigFile = "log4net.config")]
@@ -12,7 +13,7 @@ namespace SlackArchiveReaderConsoleApp
         {
             try
             {
-                string versionMsg = $"Welcome to Slack Archive Reader version: 0.0.1.0";
+                string versionMsg = $"Welcome to Slack Archive Reader version: 0.0.1.1";
                 Console.WriteLine(versionMsg);
                 var builder = new ConfigurationBuilder()
                                     .SetBasePath(Directory.GetCurrentDirectory())
@@ -24,18 +25,40 @@ namespace SlackArchiveReaderConsoleApp
                 if (!string.IsNullOrEmpty(downloadFiles) && !downloadFiles.Equals("true"))
                     isDownloadFiles = false;
 
+                string startDate = configuration["StartDate"];
+                DateTime startd = DateTime.MinValue;
+                DateTime endd = DateTime.MaxValue;
+                if (!string.IsNullOrEmpty(startDate))
+                {
+                    if (!DateTime.TryParseExact(startDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out startd))
+                    {
+                        Console.Write("Incorrect start date set in the appsettings.json config file. Set date in yyyy-mm-dd " +
+                            "format, or keep as empty if there is no start date. Press Enter key to exit ");
+                        Console.ReadLine();
+                        return;
+                    }
+                }
+
+                string endDate = configuration["EndDate"];
+                if (!string.IsNullOrEmpty(endDate))
+                {
+                    if (!DateTime.TryParseExact(endDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out endd))
+                    {
+                        Console.Write("Incorrect end date set in the appsettings.json config file. Set date in yyyy-mm-dd " +
+                            "format, or keep as empty if there is no end date. Press Enter key to exit ");
+                        Console.ReadLine();
+                        return;
+                    }
+                }
+
                 SlackReader slackReader = new SlackReader();
                 slackReader.Load();
                 Console.Write("Enter archive folder path: ");
                 string archiveFolder = Console.ReadLine();
 
-                //TEST code
-                //archiveFolder = @"C:\Projects\My projects\SlackReaderApp\BowbazarSlackExportJun2017_Test2";
                 Console.Write("Enter output folder path: ");
                 string outputFolder = Console.ReadLine();
-                //outputFolder = @"C:\Projects\My projects\SlackReaderApp\ou\";
-
-                bool success = slackReader.Start(archiveFolder, outputFolder, isDownloadFiles);
+                bool success = slackReader.Start(archiveFolder, outputFolder, isDownloadFiles, startd, endd);
 
                 if (success)
                 {

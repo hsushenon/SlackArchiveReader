@@ -45,13 +45,18 @@ namespace Lib
 
         //Coverts time stamp to date time, there is some issue with conversion so logic 
         //needs to be rechecked as to how Slack does it
-        public static DateTime TimeStampToDateTime(double timeStamp)
+        public static DateTime TimeStampToLocalDateTime(double timeStamp)
         {
             // Unix timestamp is seconds past epoch
             System.DateTime dtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-            dtDateTime = dtDateTime.AddSeconds(timeStamp);//.ToUniversalTime();
-            //TODO Check correct algorithm, currently it seems its 4 hours earlier so, adjusting
-            dtDateTime = dtDateTime.AddHours(-4);
+            dtDateTime = dtDateTime.AddSeconds(timeStamp).ToLocalTime();
+            return dtDateTime;
+        }
+        public static DateTime TimeStampToUTCDateTime(double timeStamp)
+        {
+            // Unix timestamp is seconds past epoch
+            System.DateTime dtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
+            dtDateTime = dtDateTime.AddSeconds(timeStamp);
             return dtDateTime;
         }
     }
